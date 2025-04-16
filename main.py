@@ -1,61 +1,72 @@
 import yaml
 import requests
 import time
+import sys
+from urllib.parse import urlparse
 from collections import defaultdict
 
-# Function to load configuration from the YAML file
-def load_config(file_path):
-    with open(file_path, 'r') as file:
-        return yaml.safe_load(file)
+# Track cumulative availability per domain
+domain_stats = defaultdict(lambda: {"up": 0, "total": 0})
 
-# Function to perform health checks
-def check_health(endpoint):
-    url = endpoint['url']
-    method = endpoint.get('method')
-    headers = endpoint.get('headers')
-    body = endpoint.get('body')
+# Parse domain and strip port
+def get_domain(url):
+    parsed = urlparse(url)
+    return parsed.hostname
+
+# Load config file
+def load_config(path):
+    with open(path, "r") as f:
+        return yaml.safe_load(f)
+
+# Perform a health check
+def check(endpoint):
+    url = endpoint["url"]
+    method = endpoint.get("method", "GET").upper()
+    headers = endpoint.get("headers", {})
+    body = endpoint.get("body", None)
+    domain = get_domain(url)
+
+    domain_stats[domain]["total"] += 1
 
     try:
-        response = requests.request(method, url, headers=headers, json=body)
-        if 200 <= response.status_code < 300:
-            return "UP"
-        else:
-            return "DOWN"
+        start = time.time()
+        response = requests.request(method, url, headers=headers, data=body, timeout=0.5)
+        elapsed = (time.time() - start) * 1000  # ms
+        
+        print(f"[DEBUG] {url} - {response.status_code} - {elapsed:.2f}ms")
+        if 200 <= response.status_code < 300 and elapsed <= 500:
+            domain_stats[domain]["up"] += 1
+
     except requests.RequestException:
-        return "DOWN"
+        pass  # Consider DOWN
 
-# Main function to monitor endpoints
-def monitor_endpoints(file_path):
-    config = load_config(file_path)
-    domain_stats = defaultdict(lambda: {"up": 0, "total": 0})
+# Log availability
+def print_report():
+    print("\n--- Availability Report ---")
+    for domain, stats in domain_stats.items():
+        total = stats["total"]
+        up = stats["up"]
+        availability = (up / total) * 100 if total else 0
+        print(f"{domain}: {availability:.2f}%")
+    print("---------------------------")
 
+# Main monitoring loop
+def monitor(path):
+    config = load_config(path)
     while True:
         for endpoint in config:
-            domain = endpoint["url"].split("//")[-1].split("/")[0]
-            result = check_health(endpoint)
-
-            domain_stats[domain]["total"] += 1
-            if result == "UP":
-                domain_stats[domain]["up"] += 1
-
-        # Log cumulative availability percentages
-        for domain, stats in domain_stats.items():
-            availability = round(100 * stats["up"] / stats["total"])
-            print(f"{domain} has {availability}% availability percentage")
-
-        print("---")
+            check(endpoint)
+        print_report()
         time.sleep(15)
 
-# Entry point of the program
+# CLI entry
 if __name__ == "__main__":
-    import sys
-
     if len(sys.argv) != 2:
-        print("Usage: python monitor.py <config_file_path>")
+        print("Usage: python main.py <config.yaml>")
         sys.exit(1)
 
-    config_file = sys.argv[1]
+    config_path = sys.argv[1]
     try:
-        monitor_endpoints(config_file)
+        monitor(config_path)
     except KeyboardInterrupt:
-        print("\nMonitoring stopped by user.")
+        print("\nMonitoring stopped.")
