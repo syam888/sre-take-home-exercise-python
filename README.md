@@ -1,6 +1,6 @@
 # Fetch Rewards – SRE Take-Home Exercise (Python)
 
-## 🧪 Overview
+## Overview
 
 This tool checks the availability of HTTP endpoints defined in a YAML config file. It:
 - Sends requests every 15 seconds
@@ -11,7 +11,7 @@ This tool checks the availability of HTTP endpoints defined in a YAML config fil
 
 ---
 
-## 📂 Files
+## Files
 
 - `main.py`: Main Python script
 - `sample.yaml`: YAML config defining endpoints (already provided)
@@ -19,7 +19,7 @@ This tool checks the availability of HTTP endpoints defined in a YAML config fil
 
 ---
 
-## ⚙️ Setup & Installation
+## Setup & Installation
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/sre-take-home-exercise-python.git
